@@ -7,15 +7,26 @@ services:
       - ./output_files:/output
     command: parsedmarc -c /parsedmarc.ini /input/* --debug
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     restart: on-failure
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.5
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.26
+    healthcheck:
+      test: curl -s http://localhost:9200 >/dev/null || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 50
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
     environment:
       - discovery.type=single-node
-    volumes:
-      - ./elastic_data:/usr/share/elasticsearch/data
+      - ES_JAVA_OPTS=-Xms2G -Xmx2G
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
 
   grafana:
     build: ./grafana/
@@ -25,3 +36,6 @@ services:
     environment:
       GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-worldmap-panel
       GF_AUTH_ANONYMOUS_ENABLED: 'true'
+
+volumes:
+  elastic_data:
