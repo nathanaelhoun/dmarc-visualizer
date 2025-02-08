@@ -1,14 +1,22 @@
 services:
   parsedmarc:
-    build: ./parsedmarc/
+    build:
+      dockerfile_inline: |
+        FROM python:3.13-alpine3.21
+
+        RUN apk add --update --no-cache libxml2-dev libxslt-dev
+        RUN apk add --update --no-cache --virtual .build_deps build-base libffi-dev
+        RUN pip install parsedmarc==8.17.0
+        RUN apk del .build_deps
     volumes:
-      - ./files:/input:ro
-      - ./output_files:/output
-    command: parsedmarc -c /parsedmarc.ini /input/* --debug
+      - "./output_files:/output"
+      - "./parsedmarc.ini:/parsedmarc.ini:ro"
+      - "/var/lib/GeoIP/GeoLite2-Country.mmdb:/usr/share/GeoIP/GeoLite2-Country.mmdb:ro"
+    command: parsedmarc --config /parsedmarc.ini --verbose
     depends_on:
       elasticsearch:
         condition: service_healthy
-    restart: on-failure
+    restart: no
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.26
@@ -20,20 +28,23 @@ services:
     volumes:
       - elastic_data:/usr/share/elasticsearch/data
     environment:
-      - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms2G -Xmx2G
+      - "discovery.type=single-node"
+      - "ES_JAVA_OPTS=-Xms2G -Xmx2G"
+      - "xpack.security.enabled=false"
     ulimits:
+      nproc: 65535
       memlock:
-        soft: -1
-        hard: -1
+        soft: 65535
+        hard: 65535
+    mem_limit: 4G
 
   grafana:
-    build: ./grafana/
+    image: grafana/grafana:11.4.0
     ports:
       - 3000:3000
-    user: root
+    volumes:
+      - "./grafana-provisioning:/etc/grafana/provisioning/:ro"
     environment:
-      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-worldmap-panel
       GF_AUTH_ANONYMOUS_ENABLED: 'true'
 
 volumes:
