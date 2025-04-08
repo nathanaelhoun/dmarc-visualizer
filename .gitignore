@@ -2,4 +2,5 @@
 /output_files/
 /parsedmarc/GeoLite2-Country*
 /elastic_data/
+/.last-run-date
 parsedmarc.ini
